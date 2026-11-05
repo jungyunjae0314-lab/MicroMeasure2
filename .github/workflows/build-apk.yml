@@ -1,0 +1,47 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Arrange files into project folders
+        run: |
+          set -e
+          if [ -f MainActivity.java ]; then
+            mkdir -p app/src/main/java/com/micromeasure app/src/main/res/drawable app/src/main/res/values gradle/wrapper
+            for f in build*.gradle; do
+              if grep -q "namespace" "$f"; then mv "$f" app.gradle.tmp; else mv "$f" root.gradle.tmp; fi
+            done
+            mv app.gradle.tmp app/build.gradle
+            mv root.gradle.tmp build.gradle
+            mv AndroidManifest.xml app/src/main/
+            mv *.java app/src/main/java/com/micromeasure/
+            mv ic_launcher.xml app/src/main/res/drawable/
+            mv strings.xml app/src/main/res/values/
+            mv gradle-wrapper.jar gradle-wrapper.properties gradle/wrapper/
+          fi
+          find . -path ./.git -prune -o -type f -print
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Build debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+          cp app/build/outputs/apk/debug/app-debug.apk MicroMeasure.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MicroMeasure-APK
+          path: MicroMeasure.apk
